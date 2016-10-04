@@ -1,72 +1,59 @@
-library(data.table)
+library(datasets)
 
-## reads data and returns a data.table
-readData <- function(file){
-    stDate <- strptime("01/02/2007", "%d/%m/%Y")
-    endDate <- strptime("02/02/2007", "%d/%m/%Y")
-    naCharacter <- "?"
+# import data into memory                  
+readData <- function(filePath){
+    # create a class to convert date field while reading
+    setClass("myDate")
+    setAs("character","myDate", function(from) as.Date(from, format="%d/%m/%Y"))
     
-    dt <- read.table(file, sep=";", na.strings = naCharacter, header=TRUE, stringsAsFactors=FALSE)
+    # read the data from the file
+library(datasets)
+    epc <- read.table(filePath, 
+                      sep=";", 
+                      colClasses = c("myDate", "character", "character", "character", "character", "character", "character", "character", "character"), 
+                      stringsAsFactors = FALSE, 
+                      na.strings="?",
+                      header = TRUE)
     
-    ## take only the values for 01/02/2007 and 02/02/2007
-    dt <-  dt[strptime(dt[, "Date" ], "%d/%m/%Y") >=  stDate & strptime(dt[,"Date" ], "%d/%m/%Y") <= endDate, ]
-    
-    dt
+    # filter the frame to fetch only records for 2007-02-01 and 2007-02-02
+    epc <- epc[epc$Date >= as.Date("2007-02-01", "%Y-%m-%d") & epc$Date < as.Date("2007-02-03", "%Y-%m-%d"), ]
+    epc
 }
 
+# convert numeric fields from character to numeric
+convertToNumeric <- function(epc){
+    # 
+    epc$Time <- as.POSIXct(paste(epc$Date, epc$Time), format="%Y-%m-%d %H:%M:%S")
+    epc$Global_active_power <- as.numeric(epc$Global_active_power)
+    epc$Global_reactive_power <- as.numeric(epc$Global_reactive_power)
+    epc$Voltage <- as.numeric(epc$Voltage)
+    epc$Global_intensity <- as.numeric(epc$Global_intensity)
+    epc$Sub_metering_1 <- as.numeric(epc$Sub_metering_1)
+    epc$Sub_metering_2 <- as.numeric(epc$Sub_metering_2)
+    epc$Sub_metering_3 <- as.numeric(epc$Sub_metering_3)
+    epc
+}
+    
 plot4 <- function(){
-    ## file <- "household_power_consumption.txt"
-    file <- "2dayData.txt"
+    # set file path
+    fPath = "household_power_consumption.txt"
     
-    plotFileName <- "plot4.png"
-    wd <- 480  ## plot file width
-    ht <- 480  ## plot file height
+    # read the file
+    epc <- readData(fPath)
     
-    ## read data and filter
-    dt <- readData(file)
+    # convert all numeric fields from char to numeric
+    epc <- convertToNumeric(epc)
     
-    ## draw the plot
-    ## set the frame for 4 plots (2x2)
-    
-    ## Margins are specified as 4-long vectors of integers. Each number tells how many lines of text to leave at
-    ## each side. The numbers are assigned clockwise starting at the bottom. The default for the inner margin is
-    ## c(5.1, 4.1, 4.1, 2.1) so you can see we reduced each of these so we'll have room for some outer text.
-    par(mfrow=c(2,2), mar=c(4,4,2,2), oma=c(0,0,1,0))
-    ## draw plot 1, 1
-    plot(as.POSIXct(paste(dt$Date, dt$Time), format="%d/%m/%Y %H:%M:%S"), 
-         dt$Global_active_power, type = "l",  ylab="Global Active Power", xlab="")
-    
-    ## draw plot 1, 2
-    plot(as.POSIXct(paste(dt$Date, dt$Time), format="%d/%m/%Y %H:%M:%S"), 
-         dt$Voltage, type = "l",  col="black", ylab="Voltage", xlab="dateTime")
-    
-    ## draw plot 2, 1
-    plot(as.POSIXct(paste(dt$Date, dt$Time), format="%d/%m/%Y %H:%M:%S"), 
-         dt$Sub_metering_1, type = "l",  col="black", ylab="Energy sub metering", xlab="",
-         ylim=range( c(dt$Sub_metering_1, dt$Sub_metering_2, dt$Sub_metering_3) ) )
-    par(new=T)
-    
-    plot(as.POSIXct(paste(dt$Date, dt$Time), format="%d/%m/%Y %H:%M:%S"), 
-         dt$Sub_metering_2, type = "l",  col="red", ylab ="", xlab="",
-         ylim=range( c(dt$Sub_metering_1, dt$Sub_metering_2, dt$Sub_metering_3) )
-    )
-    par(new=T)
-    plot(as.POSIXct(paste(dt$Date, dt$Time), format="%d/%m/%Y %H:%M:%S"), 
-         dt$Sub_metering_3, type = "l",  col="blue", ylab ="", xlab="",
-         ylim=range( c(dt$Sub_metering_1, dt$Sub_metering_2, dt$Sub_metering_2) )
-    )
-    
-    ## bty box type none
-    legend("topright", lty=c(1,1,1), col=c("black", "red", "blue"), 
-           legend=c("Sub_metering_1", "Sub_metering_2", "Sub_metering_3" ),
-           bty="n")
-    
-    ## draw plot(2, 2)
-    plot(as.POSIXct(paste(dt$Date, dt$Time), format="%d/%m/%Y %H:%M:%S"), 
-         dt$Global_reactive_power, type = "l",  col="black",
-         ylab="Global_reactive_power", xlab="dateTime")
-    
-    ## copy the output to a png file
-    dev.copy(png, file=plotFileName, width=wd, height=ht)
+    # generate plot4
+    png(file = "plot4.png", width=480, height = 480)
+    par(mfrow=c(2,2))
+    plot(epc$Time, epc$Global_active_power, type="l", xlab="", ylab="Global Active Power")
+    plot(epc$Time, epc$Voltage, type="l", xlab="datetime", ylab="Voltage")
+    plot(epc$Time, epc$Sub_metering_1, type="l", xlab="", ylab="Energy sub metering")
+    points(epc$Time, epc$Sub_metering_2, type="l", col="red")
+    points(epc$Time, epc$Sub_metering_3, type="l", col="blue")
+    legend("topright", lty=c(1,1,1), pch=c(NA, NA, NA), col = c("black", "red", "blue"), legend = c("Sub_metering_1", "Sub_metering_2", "Sub_metering_3"))
+    plot(epc$Time, epc$Global_reactive_power, type="l", xlab="datetime", ylab="Global_reactive_power")
     dev.off()
 }
+
